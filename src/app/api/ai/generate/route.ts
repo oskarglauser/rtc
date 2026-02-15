@@ -54,21 +54,21 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Generate with OpenAI
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4o",
-      messages: [
-        { role: "system", content: SYSTEM_PROMPT },
-        { role: "user", content: userPrompt },
-      ],
-      response_format: {
-        type: "json_schema",
-        json_schema: itineraryJsonSchema,
+    // Generate with OpenAI Responses API
+    const response = await openai.responses.create({
+      model: "gpt-5.2",
+      instructions: SYSTEM_PROMPT,
+      input: userPrompt,
+      text: {
+        format: {
+          type: "json_schema",
+          ...itineraryJsonSchema,
+        },
       },
       temperature: 0.7,
     });
 
-    const content = completion.choices[0]?.message?.content;
+    const content = response.output_text;
     if (!content) {
       await supabase
         .from("trips")

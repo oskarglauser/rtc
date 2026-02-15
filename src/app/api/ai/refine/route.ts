@@ -40,18 +40,22 @@ export async function POST(req: NextRequest) {
     const stream = new ReadableStream({
       async start(controller) {
         try {
-          const completion = await openai.chat.completions.create({
-            model: "gpt-4o",
-            messages: [
-              { role: "system", content: SYSTEM_PROMPT },
-              ...conversation.filter((m) => m.role !== "system").map((m) => ({
-                role: m.role as "user" | "assistant",
-                content: m.content,
-              })),
-            ],
-            response_format: {
-              type: "json_schema",
-              json_schema: itineraryJsonSchema,
+          const conversationInput = conversation
+            .filter((m) => m.role !== "system")
+            .map((m) => ({
+              role: m.role as "user" | "assistant",
+              content: m.content,
+            }));
+
+          const stream = await openai.responses.create({
+            model: "gpt-5.2",
+            instructions: SYSTEM_PROMPT,
+            input: conversationInput,
+            text: {
+              format: {
+                type: "json_schema",
+                ...itineraryJsonSchema,
+              },
             },
             stream: true,
             temperature: 0.7,
@@ -59,11 +63,10 @@ export async function POST(req: NextRequest) {
 
           let fullContent = "";
 
-          for await (const chunk of completion) {
-            const delta = chunk.choices[0]?.delta?.content;
-            if (delta) {
-              fullContent += delta;
-              controller.enqueue(encoder.encode(delta));
+          for await (const event of stream) {
+            if (event.type === "response.output_text.delta") {
+              fullContent += event.delta;
+              controller.enqueue(encoder.encode(event.delta));
             }
           }
 
